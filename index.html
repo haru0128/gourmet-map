@@ -3,50 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>高知市グルメマップ - 完全版</title>
+    <title>高知市グルメマップ</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; padding: 0; font-family: 'Helvetica Neue', Arial, sans-serif; display: flex; height: 100vh; overflow: hidden; }
-        #sidebar { width: 350px; background: #f8f9fa; border-right: 1px solid #ddd; display: flex; flex-direction: column; z-index: 2000; }
+        
+        /* サイドバー設定 */
+        #sidebar { width: 360px; background: #f8f9fa; border-right: 1px solid #ddd; display: flex; flex-direction: column; z-index: 2000; box-shadow: 2px 0 5px rgba(0,0,0,0.05); }
         .sidebar-header { padding: 15px; background: #fff; border-bottom: 2px solid #3498db; }
+        .sort-select { width: 100%; padding: 8px; margin-top: 10px; border-radius: 4px; border: 1px solid #ccc; font-size: 0.85em; background: #fff; cursor: pointer; }
         
-        .sort-select { width: 100%; padding: 8px; margin-top: 10px; border-radius: 4px; border: 1px solid #ccc; font-size: 0.85em; background: #fff; }
-
+        /* リストアイテム */
         #shop-list { flex: 1; overflow-y: auto; padding: 10px; }
-        .shop-item { background: white; padding: 12px; margin-bottom: 8px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: pointer; border-left: 4px solid transparent; }
-        .shop-item:hover { border-left-color: #3498db; background: #f0f7ff; }
+        .shop-item { background: white; padding: 12px; margin-bottom: 8px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: pointer; border-left: 4px solid transparent; transition: 0.2s; }
+        .shop-item:hover { border-left-color: #3498db; background: #f0f7ff; transform: translateY(-1px); }
         
+        /* バッジ・評価色 */
         .status-badge, .cat-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75em; font-weight: bold; }
         .status-badge { border-radius: 12px; margin-left: 5px; }
         .open { background: #2ecc71; color: white; }
         .closed { background: #7f8c8d; color: white; }
         .cat-badge { color: white; margin-right: 5px; min-width: 85px; text-align: center; }
-        
-        /* レストラン(黄色)の文字色調整 */
-        .cat-yellow { color: #333 !important; }
+        .cat-yellow-text { color: #333 !important; } /* レストラン用 */
+        .rating-gold { color: #f39c12; font-weight: bold; } /* 評価の黄色を統一 */
 
         .time-text { font-size: 0.8em; color: #555; margin-top: 6px; display: block; }
-
+        
+        /* マップエリア */
         #map-container { flex: 1; position: relative; }
         #map { height: 100%; width: 100%; }
         
+        /* 右上コントロールパネル */
         .control-panel { 
             position: absolute; top: 10px; right: 10px; z-index: 1000; 
             background: rgba(255,255,255,0.95); padding: 12px; border-radius: 8px; 
             width: 170px; box-shadow: 0 2px 15px rgba(0,0,0,0.1);
         }
         .filter-label { font-size: 0.8em; font-weight: bold; margin: 12px 0 6px; display: block; color: #444; border-left: 3px solid #3498db; padding-left: 5px; }
-        .filter-label:first-child { margin-top: 0; }
-        
-        .filter-btn { display: block; width: 100%; background: white; border: 1px solid #ddd; padding: 5px; margin-bottom: 4px; cursor: pointer; border-radius: 4px; font-size: 0.75em; text-align: center; transition: 0.2s; }
-        .filter-btn.active { background: #3498db; color: white; border-color: #2980b9; font-weight: bold; }
+        .filter-btn { display: block; width: 100%; background: white; border: 1px solid #ddd; padding: 6px; margin-bottom: 4px; cursor: pointer; border-radius: 4px; font-size: 0.75em; text-align: center; transition: 0.2s; }
+        .rat-f { color: #f39c12; }
+        .filter-btn.active { background: #3498db !important; color: white !important; border-color: #2980b9; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div id="sidebar">
     <div class="sidebar-header">
-        <h2 style="margin:0; font-size:1.1em;">高知市グルメマップ</h2>
+        <h2 style="margin:0; font-size:1.1em; color:#2c3e50;">高知市グルメマップ</h2>
         <select class="sort-select" onchange="updateSort(this.value)">
             <option value="high">評価が高い順</option>
             <option value="low">評価が低い順</option>
@@ -74,7 +77,7 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // 全データ（最新色設定）
+    // 全35店舗データ
     const locations = [
         { name: "メフィストフェレス", lat: 33.559475, lng: 133.535597, rating: 4.4, cat: "カフェ", color: "#e67e22", displayTime: "9:00～21:00", hours: { type: "weekly", weekday: ["09:00", "21:00"], weekend: ["08:00", "21:00"] } },
         { name: "ファウスト", lat: 33.559969, lng: 133.538814, rating: 3.9, cat: "カフェ", color: "#e67e22", displayTime: "9:00～18:00", hours: { type: "daily", range: [["09:00", "18:00"]] } },
@@ -83,34 +86,34 @@
         { name: "土佐水木", lat: 33.538415, lng: 133.485374, rating: 4.0, cat: "カフェ", color: "#e67e22", displayTime: "11:00～17:00", hours: { type: "daily", range: [["11:00", "17:00"]] } },
         { name: "ミュージアムカフェ マルク", lat: 33.561311, lng: 133.573169, rating: 3.7, cat: "カフェ", color: "#e67e22", displayTime: "9:00～17:00", hours: { type: "daily", range: [["09:00", "17:00"]] } },
         { name: "カフェ ド 梵", lat: 33.560774, lng: 133.539175, rating: 3.7, cat: "カフェ", color: "#e67e22", displayTime: "11:30～23:00", hours: { type: "special_cafe_bon" } },
-        { name: "カフェ ガウディ", lat: 33.549905, lng: 133.511054, rating: 4.0, cat: "カフェ", color: "#e67e22", displayTime: "7:00～14:00", hours: { type: "daily", range: [["07:00", "14:00"]], off: [3] } },
+        { name: "カフェ ガウディ", lat: 33.549905, lng: 133.511054, rating: 4.0, cat: "カフェ", color: "#e67e22", displayTime: "7:00～14:00 (水休)", hours: { type: "daily", range: [["07:00", "14:00"]], off: [3] } },
         { name: "カフェ VIENTO", lat: 33.553961, lng: 133.515355, rating: 4.5, cat: "カフェ", color: "#e67e22", displayTime: "10:00～16:00", hours: { type: "viento" } },
         { name: "Tea Café Lune", lat: 33.560673, lng: 133.534987, rating: 4.2, cat: "カフェ", color: "#e67e22", displayTime: "11:00～18:00", hours: { type: "weekly", weekday: ["12:00", "18:00"], weekend: ["11:00", "18:00"] } },
         { name: "SPOON", lat: 33.559393, lng: 133.535541, rating: 4.1, cat: "カフェ", color: "#e67e22", displayTime: "7:00～18:00", hours: { type: "weekly", weekday: ["07:00", "18:00"], weekend: ["07:00", "17:00"] } },
-        { name: "土佐茶カフェ", lat: 33.560087, lng: 133.537253, rating: 4.0, cat: "カフェ", color: "#e67e22", displayTime: "11:00～17:00", hours: { type: "daily", range: [["11:00", "17:00"]], off: [3] } },
+        { name: "土佐茶カフェ", lat: 33.560087, lng: 133.537253, rating: 4.0, cat: "カフェ", color: "#e67e22", displayTime: "11:00～17:00 (水休)", hours: { type: "daily", range: [["11:00", "17:00"]], off: [3] } },
         { name: "珈琲専門店 POEM", lat: 33.56078, lng: 133.541147, rating: 4.3, cat: "カフェ", color: "#e67e22", displayTime: "10:00～17:00", hours: { type: "weekly_poem" } },
         { name: "らんぷ", lat: 33.561243, lng: 133.54231, rating: 4.1, cat: "カフェ", color: "#e67e22", displayTime: "10:00～17:00", hours: { type: "daily", range: [["10:00", "17:00"]] } },
         { name: "クメヤ", lat: 33.560326, lng: 133.538392, rating: 3.2, cat: "カフェ", color: "#e67e22", displayTime: "7:00～18:00", hours: { type: "daily", range: [["07:00", "18:00"]] } },
         { name: "アンの庭", lat: 33.553702, lng: 133.562549, rating: 4.0, cat: "カフェ", color: "#e67e22", displayTime: "7:00～17:00", hours: { type: "daily", range: [["07:00", "17:00"]] } },
-        { name: "MIKKE", lat: 33.556753, lng: 133.522776, rating: 4.4, cat: "カフェ", color: "#e67e22", displayTime: "11:00～16:00", hours: { type: "daily", range: [["11:00", "16:00"]], off: [0,1] } },
+        { name: "MIKKE", lat: 33.556753, lng: 133.522776, rating: 4.4, cat: "カフェ", color: "#e67e22", displayTime: "11:00～16:00 (月火休)", hours: { type: "daily", range: [["11:00", "16:00"]], off: [1,2] } },
         { name: "風見鶏", lat: 33.569517, lng: 133.506994, rating: 3.8, cat: "レストラン", color: "#f1c40f", displayTime: "9:00～21:00", hours: { type: "daily", range: [["09:00", "21:00"]] } },
         { name: "穀物学校", lat: 33.557113, lng: 133.578962, rating: 4.0, cat: "レストラン", color: "#f1c40f", displayTime: "9:00～21:00", hours: { type: "daily", range: [["09:00", "21:00"]] } },
         { name: "あじさい街道", lat: 33.507142, lng: 133.466509, rating: 3.9, cat: "レストラン", color: "#f1c40f", displayTime: "9:00～21:00", hours: { type: "daily", range: [["09:00", "21:00"]] } },
         { name: "TUKI 煮込み料理と和の洋食屋さん", lat: 33.556924, lng: 133.516572, rating: 3.9, cat: "レストラン", color: "#f1c40f", displayTime: "11:30～17:00", hours: { type: "daily", range: [["11:30", "17:00"]] } },
         { name: "Hungry Bear", lat: 33.543121, lng: 133.524765, rating: 4.3, cat: "レストラン", color: "#f1c40f", displayTime: "11:00～21:30", hours: { type: "daily", range: [["11:00", "15:00"], ["17:00", "21:30"]], off: [2] } },
-        { name: "ミラノ亭", lat: 33.559199, lng: 133.543908, rating: 4.3, cat: "レストラン", color: "#f1c40f", displayTime: "11:00～21:00", hours: { type: "daily", range: [["11:00", "21:00"]], off: [2] } },
+        { name: "ミラノ亭", lat: 33.559199, lng: 133.543908, rating: 4.3, cat: "レストラン", color: "#f1c40f", displayTime: "11:00～21:00 (火休)", hours: { type: "daily", range: [["11:00", "21:00"]], off: [2] } },
         { name: "あるぺんはうす", lat: 33.57502, lng: 133.55212, rating: 4.0, cat: "レストラン", color: "#f1c40f", displayTime: "8:00～23:00", hours: { type: "daily", range: [["08:00", "23:00"]] } },
-        { name: "レストラン ピック", lat: 33.505556, lng: 133.54172, rating: 4.0, cat: "レストラン", color: "#f1c40f", displayTime: "11:30～20:00", hours: { type: "daily", range: [["11:30", "14:00"], ["17:30", "20:00"]], off: [2] } },
-        { name: "5019 PREMIUM", lat: 33.560643, lng: 133.540149, rating: 4.0, cat: "レストラン", color: "#f1c40f", displayTime: "11:00～ / 木曜休", hours: { type: "5019" } },
-        { name: "FAMILY ASAHI", lat: 33.556031, lng: 133.50815, rating: 3.8, cat: "レストラン", color: "#f1c40f", displayTime: "9:00～20:00", hours: { type: "daily", range: [["09:00", "20:00"]], off: [1] } },
+        { name: "レストラン ピック", lat: 33.505556, lng: 133.54172, rating: 4.0, cat: "レストラン", color: "#f1c40f", displayTime: "11:30～20:00 (火休)", hours: { type: "daily", range: [["11:30", "14:00"], ["17:30", "20:00"]], off: [2] } },
+        { name: "5019 PREMIUM", lat: 33.560643, lng: 133.540149, rating: 4.0, cat: "レストラン", color: "#f1c40f", displayTime: "11:00～ (木休)", hours: { type: "5019" } },
+        { name: "FAMILY ASAHI", lat: 33.556031, lng: 133.50815, rating: 3.8, cat: "レストラン", color: "#f1c40f", displayTime: "9:00～20:00 (月休)", hours: { type: "daily", range: [["09:00", "20:00"]], off: [1] } },
         { name: "マンジェ・ササ", lat: 33.571419, lng: 133.556321, rating: 3.8, cat: "パン・ケーキ", color: "#e84393", displayTime: "9:30～19:00", hours: { type: "daily", range: [["09:30", "19:00"]] } },
-        { name: "Mon plaisir", lat: 33.554108, lng: 133.561748, rating: 4.1, cat: "パン・ケーキ", color: "#e84393", displayTime: "10:30～19:00", hours: { type: "daily", range: [["10:30", "19:00"]], off: [3] } },
-        { name: "CHITAPAN", lat: 33.567614, lng: 133.59948, rating: 4.2, cat: "パン・ケーキ", color: "#e84393", displayTime: "7:00～17:00", hours: { type: "daily", range: [["07:00", "17:00"]], off: [1] } },
-        { name: "Donuts Patio", lat: 33.543507, lng: 133.51045, rating: 4.6, cat: "パン・ケーキ", color: "#e84393", displayTime: "10:00～18:00", hours: { type: "daily", range: [["10:00", "18:00"]], off: [1] } },
+        { name: "Mon plaisir", lat: 33.554108, lng: 133.561748, rating: 4.1, cat: "パン・ケーキ", color: "#e84393", displayTime: "10:30～19:00 (水休)", hours: { type: "daily", range: [["10:30", "19:00"]], off: [3] } },
+        { name: "CHITAPAN", lat: 33.567614, lng: 133.59948, rating: 4.2, cat: "パン・ケーキ", color: "#e84393", displayTime: "7:00～17:00 (月休)", hours: { type: "daily", range: [["07:00", "17:00"]], off: [1] } },
+        { name: "Donuts Patio", lat: 33.543507, lng: 133.51045, rating: 4.6, cat: "パン・ケーキ", color: "#e84393", displayTime: "10:00～18:00 (月休)", hours: { type: "daily", range: [["10:00", "18:00"]], off: [1] } },
         { name: "たねまる", lat: 33.558396, lng: 133.527063, rating: 4.2, cat: "パン・ケーキ", color: "#e84393", displayTime: "8:45～18:30", hours: { type: "daily", range: [["08:45", "18:30"]], off: [0,1,2] } },
-        { name: "Petit four", lat: 33.543345, lng: 133.509749, rating: 4.5, cat: "パン・ケーキ", color: "#e84393", displayTime: "11:00～19:00", hours: { type: "daily", range: [["11:00", "19:00"]], off: [2] } },
-        { name: "Romande", lat: 33.567645, lng: 133.530037, rating: 4.2, cat: "パン・ケーキ", color: "#e84393", displayTime: "7:30～19:30", hours: { type: "weekly", weekday: ["07:30", "19:30"], weekend: ["07:30", "19:00"], off: [2] } },
-        { name: "おかし屋 とんぷれ", lat: 33.543573, lng: 133.497826, rating: 4.6, cat: "パン・ケーキ", color: "#e84393", displayTime: "11:00～18:00", hours: { type: "daily", range: [["11:00", "18:00"]], off: [1,2] } }
+        { name: "Petit four", lat: 33.543345, lng: 133.509749, rating: 4.5, cat: "パン・ケーキ", color: "#e84393", displayTime: "11:00～19:00 (火休)", hours: { type: "daily", range: [["11:00", "19:00"]], off: [2] } },
+        { name: "Romande", lat: 33.567645, lng: 133.530037, rating: 4.2, cat: "パン・ケーキ", color: "#e84393", displayTime: "7:30～19:30 (火休)", hours: { type: "weekly", weekday: ["07:30", "19:30"], weekend: ["07:30", "19:00"], off: [2] } },
+        { name: "おかし屋 とんぷれ", lat: 33.543573, lng: 133.497826, rating: 4.6, cat: "パン・ケーキ", color: "#e84393", displayTime: "11:00～18:00 (月火休)", hours: { type: "daily", range: [["11:00", "18:00"]], off: [1,2] } }
     ];
 
     const map = L.map('map').setView([33.56, 133.535], 14);
@@ -121,6 +124,7 @@
     let currentMinRating = 0;
     let currentSort = 'high';
 
+    // 営業判定ロジック
     function checkOpen(shop) {
         const now = new Date(); const day = now.getDay(); const time = now.getHours() * 100 + now.getMinutes();
         const h = shop.hours; if (!h) return true;
@@ -133,57 +137,52 @@
         return ranges.some(r => (time >= parseInt(r[0].replace(':','')) && time <= parseInt(r[1].replace(':',''))));
     }
 
+    // 表示更新
     function applyFilters() {
         markerLayer.clearLayers();
         const list = document.getElementById('shop-list');
         list.innerHTML = '';
 
-        // フィルタリング（カテゴリ + 評価スコア）
         let filtered = locations.filter(loc => 
-            (currentCategory === 'すべて' || loc.cat === currentCategory) && 
-            (loc.rating >= currentMinRating)
+            (currentCategory === 'すべて' || loc.cat === currentCategory) && (loc.rating >= currentMinRating)
         );
 
-        // ソート
         filtered.sort((a, b) => (currentSort === 'high' ? b.rating - a.rating : a.rating - b.rating));
 
         filtered.forEach(loc => {
             const isOpen = checkOpen(loc);
             const statusHtml = isOpen ? '<span class="status-badge open">営業中</span>' : '<span class="status-badge closed">準備中</span>';
-            const catColorClass = loc.cat === 'レストラン' ? 'cat-yellow' : '';
+            const catColorClass = loc.cat === 'レストラン' ? 'cat-yellow-text' : '';
 
-            const marker = L.circleMarker([loc.lat, loc.lng], { radius: 8, fillColor: loc.color, color: "#fff", weight: 2, opacity: 1, fillOpacity: 0.8 });
-            marker.bindPopup(`<strong>${loc.name}</strong> ${statusHtml}<br>★${loc.rating}`).addTo(markerLayer);
+            // ピン作成（カテゴリ色を使用）
+            const marker = L.circleMarker([loc.lat, loc.lng], { 
+                radius: 9, fillColor: loc.color, color: "#fff", weight: 2, opacity: 1, fillOpacity: 0.9 
+            });
+            marker.bindPopup(`<strong>${loc.name}</strong> ${statusHtml}<br><span class="rating-gold">★${loc.rating}</span>`);
+            
+            // ピンタップでズーム
+            marker.on('click', (e) => { map.flyTo(e.target.getLatLng(), 16); });
+            marker.addTo(markerLayer);
 
+            // リスト作成
             const item = document.createElement('div');
             item.className = 'shop-item';
             item.innerHTML = `
                 <div><span class="cat-badge ${catColorClass}" style="background-color:${loc.color}">${loc.cat}</span><strong>${loc.name}</strong>${statusHtml}</div>
-                <div style="font-size:0.85em;color:#f39c12;margin-top:4px;">★${loc.rating.toFixed(1)}</div>
+                <div class="rating-gold" style="font-size:0.85em; margin-top:4px;">★${loc.rating.toFixed(1)}</div>
                 <div class="time-text">🕒 ${loc.displayTime}</div>`;
-            item.onclick = () => { map.flyTo([loc.lat, loc.lng], 16); marker.openPopup(); };
+            
+            item.onclick = () => { 
+                map.flyTo([loc.lat, loc.lng], 16); 
+                marker.openPopup(); 
+            };
             list.appendChild(item);
         });
     }
 
-    function updateCategory(cat, btn) {
-        document.querySelectorAll('.cat-f').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        currentCategory = cat;
-        applyFilters();
-    }
-
-    function updateRating(rat, btn) {
-        document.querySelectorAll('.rat-f').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        currentMinRating = rat;
-        applyFilters();
-    }
-
-    function updateSort(val) {
-        currentSort = val;
-        applyFilters();
-    }
+    function updateCategory(cat, btn) { document.querySelectorAll('.cat-f').forEach(b => b.classList.remove('active')); btn.classList.add('active'); currentCategory = cat; applyFilters(); }
+    function updateRating(rat, btn) { document.querySelectorAll('.rat-f').forEach(b => b.classList.remove('active')); btn.classList.add('active'); currentMinRating = rat; applyFilters(); }
+    function updateSort(val) { currentSort = val; applyFilters(); }
 
     applyFilters();
 </script>
