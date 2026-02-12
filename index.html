@@ -3,42 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>高知市グルメマップ</title>
+    <title>高知市グルメマップ </title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; padding: 0; font-family: 'Helvetica Neue', Arial, sans-serif; display: flex; height: 100vh; overflow: hidden; }
-        
-        /* サイドバー設定 */
         #sidebar { width: 360px; background: #f8f9fa; border-right: 1px solid #ddd; display: flex; flex-direction: column; z-index: 2000; box-shadow: 2px 0 5px rgba(0,0,0,0.05); }
         .sidebar-header { padding: 15px; background: #fff; border-bottom: 2px solid #3498db; }
         .sort-select { width: 100%; padding: 8px; margin-top: 10px; border-radius: 4px; border: 1px solid #ccc; font-size: 0.85em; background: #fff; cursor: pointer; }
+        #shop-list { flex: 1; overflow-y: auto; padding: 10px; scroll-behavior: smooth; }
+        .shop-item { background: white; padding: 12px; margin-bottom: 8px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: pointer; border-left: 4px solid transparent; transition: background-color 0.5s ease; }
+        .shop-item:hover { border-left-color: #3498db; background: #f0f7ff; }
+        /* ハイライト用のクラス */
+        .highlight { background-color: #d1e9ff !important; border-left-color: #3498db; }
         
-        /* リストアイテム */
-        #shop-list { flex: 1; overflow-y: auto; padding: 10px; }
-        .shop-item { background: white; padding: 12px; margin-bottom: 8px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: pointer; border-left: 4px solid transparent; transition: 0.2s; }
-        .shop-item:hover { border-left-color: #3498db; background: #f0f7ff; transform: translateY(-1px); }
-        
-        /* バッジ・評価色 */
         .status-badge, .cat-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75em; font-weight: bold; }
         .status-badge { border-radius: 12px; margin-left: 5px; }
         .open { background: #2ecc71; color: white; }
         .closed { background: #7f8c8d; color: white; }
         .cat-badge { color: white; margin-right: 5px; min-width: 85px; text-align: center; }
-        .cat-yellow-text { color: #333 !important; } /* レストラン用 */
-        .rating-gold { color: #f39c12; font-weight: bold; } /* 評価の黄色を統一 */
-
+        .cat-yellow-text { color: #333 !important; }
+        .rating-gold { color: #f39c12; font-weight: bold; }
         .time-text { font-size: 0.8em; color: #555; margin-top: 6px; display: block; }
-        
-        /* マップエリア */
         #map-container { flex: 1; position: relative; }
         #map { height: 100%; width: 100%; }
-        
-        /* 右上コントロールパネル */
-        .control-panel { 
-            position: absolute; top: 10px; right: 10px; z-index: 1000; 
-            background: rgba(255,255,255,0.95); padding: 12px; border-radius: 8px; 
-            width: 170px; box-shadow: 0 2px 15px rgba(0,0,0,0.1);
-        }
+        .control-panel { position: absolute; top: 10px; right: 10px; z-index: 1000; background: rgba(255,255,255,0.95); padding: 12px; border-radius: 8px; width: 170px; box-shadow: 0 2px 15px rgba(0,0,0,0.1); }
         .filter-label { font-size: 0.8em; font-weight: bold; margin: 12px 0 6px; display: block; color: #444; border-left: 3px solid #3498db; padding-left: 5px; }
         .filter-btn { display: block; width: 100%; background: white; border: 1px solid #ddd; padding: 6px; margin-bottom: 4px; cursor: pointer; border-radius: 4px; font-size: 0.75em; text-align: center; transition: 0.2s; }
         .rat-f { color: #f39c12; }
@@ -65,19 +53,16 @@
         <button class="filter-btn cat-f" onclick="updateCategory('カフェ', this)">カフェ</button>
         <button class="filter-btn cat-f" onclick="updateCategory('レストラン', this)">レストラン</button>
         <button class="filter-btn cat-f" onclick="updateCategory('パン・ケーキ', this)">パン・ケーキ</button>
-        
         <span class="filter-label">評価で絞り込む</span>
         <button class="filter-btn active rat-f" onclick="updateRating(0, this)">すべて</button>
         <button class="filter-btn rat-f" onclick="updateRating(4.5, this)">★ 4.5 以上</button>
         <button class="filter-btn rat-f" onclick="updateRating(4.0, this)">★ 4.0 以上</button>
-        <button class="filter-btn rat-f" onclick="updateRating(3.5, this)">★ 3.5 以上</button>
     </div>
     <div id="map"></div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // 全35店舗データ
     const locations = [
         { name: "メフィストフェレス", lat: 33.559475, lng: 133.535597, rating: 4.4, cat: "カフェ", color: "#e67e22", displayTime: "9:00～21:00", hours: { type: "weekly", weekday: ["09:00", "21:00"], weekend: ["08:00", "21:00"] } },
         { name: "ファウスト", lat: 33.559969, lng: 133.538814, rating: 3.9, cat: "カフェ", color: "#e67e22", displayTime: "9:00～18:00", hours: { type: "daily", range: [["09:00", "18:00"]] } },
@@ -124,7 +109,6 @@
     let currentMinRating = 0;
     let currentSort = 'high';
 
-    // 営業判定ロジック
     function checkOpen(shop) {
         const now = new Date(); const day = now.getDay(); const time = now.getHours() * 100 + now.getMinutes();
         const h = shop.hours; if (!h) return true;
@@ -137,47 +121,63 @@
         return ranges.some(r => (time >= parseInt(r[0].replace(':','')) && time <= parseInt(r[1].replace(':',''))));
     }
 
-    // 表示更新
     function applyFilters() {
         markerLayer.clearLayers();
         const list = document.getElementById('shop-list');
         list.innerHTML = '';
 
-        let filtered = locations.filter(loc => 
-            (currentCategory === 'すべて' || loc.cat === currentCategory) && (loc.rating >= currentMinRating)
-        );
-
+        let filtered = locations.filter(loc => (currentCategory === 'すべて' || loc.cat === currentCategory) && (loc.rating >= currentMinRating));
         filtered.sort((a, b) => (currentSort === 'high' ? b.rating - a.rating : a.rating - b.rating));
 
-        filtered.forEach(loc => {
+        filtered.forEach((loc, index) => {
             const isOpen = checkOpen(loc);
             const statusHtml = isOpen ? '<span class="status-badge open">営業中</span>' : '<span class="status-badge closed">準備中</span>';
             const catColorClass = loc.cat === 'レストラン' ? 'cat-yellow-text' : '';
+            const displayRating = loc.rating.toFixed(1);
 
-            // ピン作成（カテゴリ色を使用）
-            const marker = L.circleMarker([loc.lat, loc.lng], { 
-                radius: 9, fillColor: loc.color, color: "#fff", weight: 2, opacity: 1, fillOpacity: 0.9 
-            });
-            marker.bindPopup(`<strong>${loc.name}</strong> ${statusHtml}<br><span class="rating-gold">★${loc.rating}</span>`);
+            // マーカー作成
+            const marker = L.circleMarker([loc.lat, loc.lng], { radius: 9, fillColor: loc.color, color: "#fff", weight: 2, opacity: 1, fillOpacity: 0.9 });
+            marker.bindPopup(`<strong>${loc.name}</strong> ${statusHtml}<br><span class="rating-gold">★${displayRating}</span>`);
             
-            // ピンタップでズーム
-            marker.on('click', (e) => { map.flyTo(e.target.getLatLng(), 16); });
+            // 重要：ピンをタップした時の処理
+            marker.on('click', (e) => { 
+                map.flyTo(e.target.getLatLng(), 16); 
+                syncList(loc.name); // リストを同期させる関数を呼ぶ
+            });
             marker.addTo(markerLayer);
 
-            // リスト作成
+            // リストアイテム作成
             const item = document.createElement('div');
             item.className = 'shop-item';
-            item.innerHTML = `
-                <div><span class="cat-badge ${catColorClass}" style="background-color:${loc.color}">${loc.cat}</span><strong>${loc.name}</strong>${statusHtml}</div>
-                <div class="rating-gold" style="font-size:0.85em; margin-top:4px;">★${loc.rating.toFixed(1)}</div>
-                <div class="time-text">🕒 ${loc.displayTime}</div>`;
+            // IDを付けて特定しやすくする
+            item.id = "shop-item-" + loc.name.replace(/\s+/g, ''); 
+            item.innerHTML = `<div><span class="cat-badge ${catColorClass}" style="background-color:${loc.color}">${loc.cat}</span><strong>${loc.name}</strong>${statusHtml}</div><div class="rating-gold" style="font-size:0.85em; margin-top:4px;">★${displayRating}</div><div class="time-text">🕒 ${loc.displayTime}</div>`;
             
             item.onclick = () => { 
                 map.flyTo([loc.lat, loc.lng], 16); 
                 marker.openPopup(); 
+                highlightItem(item);
             };
             list.appendChild(item);
         });
+    }
+
+    // 地図のピンからリストをスクロール＆強調させる関数
+    function syncList(shopName) {
+        const itemId = "shop-item-" + shopName.replace(/\s+/g, '');
+        const targetElement = document.getElementById(itemId);
+        if (targetElement) {
+            targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            highlightItem(targetElement);
+        }
+    }
+
+    // アイテムをハイライトする関数
+    function highlightItem(element) {
+        document.querySelectorAll('.shop-item').forEach(el => el.classList.remove('highlight'));
+        element.classList.add('highlight');
+        // 2秒後にハイライトを消す（お好みで）
+        setTimeout(() => { element.classList.remove('highlight'); }, 2000);
     }
 
     function updateCategory(cat, btn) { document.querySelectorAll('.cat-f').forEach(b => b.classList.remove('active')); btn.classList.add('active'); currentCategory = cat; applyFilters(); }
